@@ -1,0 +1,12 @@
+services:
+  runner:
+    image: gitea/act_runner:latest
+    container_name: gitea-runner
+    environment:
+      - GITEA_INSTANCE_URL=http://<tailscale-ip>:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN}
+      - GITEA_RUNNER_NAME=homelab-runner
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always

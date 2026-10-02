@@ -71,7 +71,7 @@ sysadmin/DevOps work for my own growth.
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
 - [x] Phase 2: Gitea
-- [ ] Phase 3: CI runner (Drone CI or similar)
+- [x] Phase 3: CI runner (Drone CI or similar)
 - [ ] Phase 4: Auto-deploy on successful build
 - [ ] Phase 5: Jellyfin (media server)
 - [ ] Phase 5b: Navidrome (music server)

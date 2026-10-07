@@ -66,14 +66,34 @@ self-hosting is more practical. I want hands-on experience with real
 sysadmin/DevOps work for my own growth.
 
 ## 7. Problems hit & fixes (running log)
+- **Jellyfin crash-looping on first start** — container showed `Restarting (139)`
+  and logs said `Access to the path '/config/log' is denied`. Cause: the
+  `config`/`cache` bind-mount folders didn't exist yet, so Docker created
+  them as root, and the container runs as UID 1000 and couldn't write to
+  them. Fix: `sudo chown -R 1000:1000 config cache`, then restart. Lesson:
+  for containers running as a non-root user, create bind-mount folders
+  yourself first (`mkdir -p config cache`).
+
+  - **Jellyfin playback stuttering / CPU at ~370%** — a 4K HEVC movie
+  froze after seeking. `docker stats jellyfin` showed the CPU pinned,
+  and Playback Info showed it was transcoding even though the browser
+  could decode the video itself. The reasons listed were the subtitle
+  codec and the audio channel count, not the video. The embedded
+  subtitle tracks were PGS (image-based), which browsers can't render,
+  so Jellyfin burned them into the video and re-encoded the whole film
+  on the CPU (~0.39x real time). Fix: use an external text subtitle
+  (.srt) named to match the video (`Movie (Year).en.srt`) so the
+  browser draws it as an overlay with no re-encode. Backup option:
+  Intel Quick Sync hardware transcoding. Lesson: check Playback Info
+  for the transcode *reason* before assuming the video is the problem.
 
 ## 8. Roadmap
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
 - [x] Phase 2: Gitea
 - [x] Phase 3: CI runner (Drone CI or similar)
-- [ ] Phase 4: Auto-deploy on successful build
-- [ ] Phase 5: Jellyfin (media server)
+- [x] Phase 4: Auto-deploy on successful build
+- [x] Phase 5: Jellyfin (media server)
 - [ ] Phase 5b: Navidrome (music server)
 - [ ] Phase 6: Monitoring (Grafana + Prometheus / Uptime Kuma)
 - [ ] Phase 7: Ansible (Infrastructure as Code)

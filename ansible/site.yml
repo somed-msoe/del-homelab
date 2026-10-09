@@ -1,0 +1,32 @@
+- name: Baseline homelab config
+  hosts: homelab
+  become: true
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name: [curl, git, restic]
+        state: present
+        update_cache: true
+
+    - name: Mask sleep targets
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        masked: true
+      loop:
+        - sleep.target
+        - suspend.target
+        - hibernate.target
+        - hybrid-sleep.target
+
+    - name: Media and data directories exist
+      ansible.builtin.file:
+        path: "/home/delsoro/{{ item }}"
+        state: directory
+        owner: delsoro
+        group: delsoro
+        mode: "0755"
+      loop:
+        - media/movies
+        - media/shows
+        - manga
+        - music

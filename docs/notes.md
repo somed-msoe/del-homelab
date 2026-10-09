@@ -58,6 +58,12 @@
   to avoid conflicts)
 - **Data location**: `~/gitea/data` on the server (bind-mounted volume)
 - **Access**: `http://<tailscale-ip>:3000`
+- **Git over SSH**: port 222, user `git` (Gitea's fixed SSH user).
+  Each machine gets its own key, added under Settings → SSH/GPG Keys
+  and revocable individually. On the server, `~/.ssh/config` has a
+  `gitea` alias pointing at 127.0.0.1:222 with the dedicated key, so
+  remotes look like `gitea:delsoro/homelab-infra.git`. No passwords
+  or tokens stored on the server.
 
 ## 6. Motivation
 

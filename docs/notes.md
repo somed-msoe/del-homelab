@@ -87,13 +87,21 @@ sysadmin/DevOps work for my own growth.
   Intel Quick Sync hardware transcoding. Lesson: check Playback Info
   for the transcode *reason* before assuming the video is the problem.
 
+  - **Pipeline silently not deploying** — pushed a `deploy.yml` change but
+  the container never updated. The Actions run showed 0s with a YAML parse
+  error (`mapping values are not allowed in this context`), so Gitea
+  rejected the workflow before running any steps. Fix: correct the
+  indentation in the `run: |` block (spaces, not tabs). Lesson: a
+  0-second failed run means a workflow syntax error, so check the run's
+  error message first, not the server.
+
 ## 8. Roadmap
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
 - [x] Phase 2: Gitea
 - [x] Phase 3: CI runner (Drone CI or similar)
 - [x] Phase 4: Auto-deploy on successful build
-- [x] Phase 5: Jellyfin (media server)
+- [x] Phase 5a: Jellyfin (media server)
 - [ ] Phase 5b: Navidrome (music server)
 - [ ] Phase 6: Monitoring (Grafana + Prometheus / Uptime Kuma)
 - [ ] Phase 7: Ansible (Infrastructure as Code)

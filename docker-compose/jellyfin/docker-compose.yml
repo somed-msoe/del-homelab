@@ -10,3 +10,5 @@ services:
       - ./config:/config
       - ./cache:/cache
       - /home/delsoro/media:/media:ro
+
+      

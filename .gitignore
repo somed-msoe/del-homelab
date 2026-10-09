@@ -1,2 +1,8 @@
+# secrets
 .env
 **/.env
+
+# runtime data from containers
+data/
+config/
+cache/

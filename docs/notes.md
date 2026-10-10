@@ -47,8 +47,23 @@
 - Added my user to the `docker` group so commands don't need `sudo`
 - Core idea: containers share the host OS kernel, much lighter than full
   VMs — chose this over Proxmox given only 8GB RAM on this box
+- **Restart policy**: all containers use `restart: unless-stopped`, so they
+  come back on their own after a reboot. Reboot test passed: rebooted the
+  server and every container recovered unattended. The `deploy.yml`
+  pipeline sets the policy on the app container too.
 
 ## 5. Services
+
+Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
+
+| Service       | Port  | Purpose                          |
+|---------------|-------|----------------------------------|
+| Gitea         | 3000  | Git server (SSH on 222)          |
+| homelab-app   | 3001  | My Node.js dashboard             |
+| Uptime Kuma   | 3002  | Service monitoring               |
+| Navidrome     | 4533  | Music (planned, not installed)   |
+| Jellyfin      | 8096  | Media server                     |
+| Komga         | 25600 | Comics/manga server              |
 
 ### Gitea (self-hosted Git server)
 - **What it does**: private GitHub — hosts my own repos
@@ -65,13 +80,68 @@
   remotes look like `gitea:delsoro/homelab-infra.git`. No passwords
   or tokens stored on the server.
 
-## 6. Motivation
+### homelab-app (Node.js dashboard)
+- **What it does**: small dashboard with a visit counter and a
+  "last deployed" timestamp; exists to exercise the CI/CD pipeline
+- **Port**: 3001
+- **Health check**: `/health` returns `{ status: 'ok' }`
+- **Deploy**: pushing to Gitea triggers the workflow in `deploy.yml`,
+  which builds and redeploys the container
+
+### Jellyfin (media server)
+- **What it does**: streams my movies and shows to browsers and devices
+- **Port**: 8096
+- **Data location**: `~/jellyfin/config` and `~/jellyfin/cache`
+  (bind mounts). TODO: add the media library path.
+- **Runs as**: UID 1000, so bind-mount folders must be owned by 1000
+  (see problems log)
+- **Playback tip**: use external `.srt` subtitles; embedded PGS
+  subtitles force a CPU transcode
+
+### Komga (comics/manga server)
+- **What it does**: serves my comic/manga library
+- **Port**: 25600
+- **Clients**: KMReader (works), Tachiyomi Komga extension (needs the
+  account email as the username)
+- **Data location**: TODO: add the config and library paths
+
+## 6. Monitoring
+
+### Uptime Kuma (service checks)
+- **What it does**: checks my services every 60s and keeps a history
+  of uptime, so outages show up as gaps with timestamps
+- **Port**: 3002 on the host (container uses 3001, which homelab-app
+  already occupies)
+- **Data**: `~/uptime-kuma/data` (SQLite)
+- **Compose file**: `docker-compose/uptime-kuma/docker-compose.yml` in
+  `homelab-infra`
+- **Monitors**: Gitea, homelab-app (/health), Jellyfin, Komga, all via
+  `host.docker.internal` (the compose file maps it with `extra_hosts`)
+- **Limit**: runs on the same machine, so it can't alert when the whole
+  box goes down. The dead-man's switch below covers that.
+
+### Dead-man's switch (healthchecks.io)
+- **What it does**: server pings healthchecks.io every 5 min via cron;
+  if pings stop, I get an email
+- **Settings**: check name `del-homelab`, period 5 min, grace 10 min
+  (so reboots and the nightly backup don't cause false alerts)
+- **Setup**: my user's crontab (not root's) runs a `curl` every 5 min
+  with `-m 10 --retry 3`
+- **Secret**: ping URL stored in `~/.healthcheck-url` (chmod 600),
+  never in git
+- **Covers**: laptop off, asleep, crashed, network lost, cron stopped
+- **Doesn't cover**: which of those it was (check Tailscale last-seen)
+  or whether services work (Uptime Kuma does that)
+- **Alert test**: TODO: record the date, how long the email took, and
+  that the recovery email arrived
+
+## 7. Motivation
 
 To understand how the infrastructure actually works, not because
 self-hosting is more practical. I want hands-on experience with real
 sysadmin/DevOps work for my own growth.
 
-## 7. Problems hit & fixes (running log)
+## 8. Problems hit & fixes (running log)
 - **Jellyfin crash-looping on first start** — container showed `Restarting (139)`
   and logs said `Access to the path '/config/log' is denied`. Cause: the
   `config`/`cache` bind-mount folders didn't exist yet, so Docker created
@@ -80,7 +150,7 @@ sysadmin/DevOps work for my own growth.
   for containers running as a non-root user, create bind-mount folders
   yourself first (`mkdir -p config cache`).
 
-  - **Jellyfin playback stuttering / CPU at ~370%** — a 4K HEVC movie
+- **Jellyfin playback stuttering / CPU at ~370%** — a 4K HEVC movie
   froze after seeking. `docker stats jellyfin` showed the CPU pinned,
   and Playback Info showed it was transcoding even though the browser
   could decode the video itself. The reasons listed were the subtitle
@@ -93,7 +163,7 @@ sysadmin/DevOps work for my own growth.
   Intel Quick Sync hardware transcoding. Lesson: check Playback Info
   for the transcode *reason* before assuming the video is the problem.
 
-  - **Pipeline silently not deploying** — pushed a `deploy.yml` change but
+- **Pipeline silently not deploying** — pushed a `deploy.yml` change but
   the container never updated. The Actions run showed 0s with a YAML parse
   error (`mapping values are not allowed in this context`), so Gitea
   rejected the workflow before running any steps. Fix: correct the
@@ -101,15 +171,38 @@ sysadmin/DevOps work for my own growth.
   0-second failed run means a workflow syntax error, so check the run's
   error message first, not the server.
 
-## 8. Roadmap
+- **Unexplained outages and containers not coming back** — the server
+  went down a few times with no clear cause, and some containers stayed
+  stopped afterward. Fix: set `restart: unless-stopped` on every
+  container (and in `deploy.yml` for the app), then rebooted to prove
+  it. Lesson: test recovery by actually rebooting, not by assuming.
+
+- **Uptime Kuma port collision** — Kuma's default port 3001 is already
+  used by homelab-app. Fix: map it to 3002 on the host (`3002:3001`).
+  Lesson: check `docker ps` for used ports before picking one.
+
+- **Komga 401 in the Tachiyomi extension** — the connection worked but
+  the login was rejected. Cause: Komga usernames are email addresses,
+  so the extension needs the exact account email, not a nickname.
+  Lesson: a 401 means the server is reachable and the credentials are
+  the problem. Test with `curl -u` on the server to separate a bad
+  login from an app problem.
+
+- **SSH paste garbling commands** — pasted multi-line commands got
+  mangled. Fix: `echo "set enable-bracketed-paste off" >> ~/.inputrc`,
+  then open a new SSH session.
+
+## 9. Roadmap
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
 - [x] Phase 2: Gitea
-- [x] Phase 3: CI runner (Drone CI or similar)
+- [x] Phase 3: CI runner
 - [x] Phase 4: Auto-deploy on successful build
 - [x] Phase 5a: Jellyfin (media server)
-- [ ] Phase 5b: Navidrome (music server)
-- [ ] Phase 6: Monitoring (Grafana + Prometheus / Uptime Kuma)
+- [x] Phase 5b: Navidrome (music server)
+- [x] Phase 6a: Monitoring (Uptime Kuma + healthchecks.io)
+- [ ] Phase 6b: Grafana + Prometheus
 - [ ] Phase 7: Ansible (Infrastructure as Code)
 - [ ] Phase 8: k3s (lightweight Kubernetes)
 - [ ] Side quest: manual WireGuard setup
+- [ ] Backups: Gitea data and Komga config, plus a tested restore

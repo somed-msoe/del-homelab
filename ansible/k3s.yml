@@ -1,0 +1,49 @@
+- name: k3s (lightweight Kubernetes) alongside Docker
+  hosts: homelab
+  vars:
+    k3s_version: "v1.36.5+k3s1"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - name: Check if k3s is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_bin
+
+    - name: Download the k3s install script
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install.sh
+        mode: "0755"
+      become: true
+      when: not k3s_bin.stat.exists
+
+    # kubeconfig is world-readable so delsoro can run kubectl without sudo
+    - name: Install k3s
+      ansible.builtin.command: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: "server --write-kubeconfig-mode=644"
+      become: true
+      when: not k3s_bin.stat.exists
+
+    - name: Wait for the node to be Ready
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      become: true
+      changed_when: false
+
+    - name: Point delsoro's shell at the cluster
+      ansible.builtin.lineinfile:
+        path: /home/delsoro/.bashrc
+        line: "export KUBECONFIG={{ kubeconfig }}"
+        owner: delsoro
+      become: true
+
+    - name: Apply Homepage
+      ansible.builtin.command: k3s kubectl apply -k /home/delsoro/homelab-infra/k8s/homepage
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      register: homepage_apply
+      changed_when: "'created' in homepage_apply.stdout or 'configured' in homepage_apply.stdout"
+      tags: apps

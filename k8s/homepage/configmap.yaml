@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage
+data:
+  settings.yaml: |
+    title: Homelab
+    headerStyle: clean
+    layout:
+      Media:
+        style: row
+        columns: 3
+      Dev:
+        style: row
+        columns: 3
+      Monitoring:
+        style: row
+        columns: 3
+  services.yaml: |
+    # Links and checks use the node's Tailscale IP: pods can reach it, and
+    # so can any device on the tailnet that opens this page.
+    - Media:
+        - Jellyfin:
+            href: http://<tailscale-ip>:8096
+            description: Movies and shows
+            siteMonitor: http://<tailscale-ip>:8096
+        - Navidrome:
+            href: http://<tailscale-ip>:4533
+            description: Music
+            siteMonitor: http://<tailscale-ip>:4533
+        - Komga:
+            href: http://<tailscale-ip>:25600
+            description: Comics and manga
+            siteMonitor: http://<tailscale-ip>:25600
+    - Dev:
+        - Gitea:
+            href: http://<tailscale-ip>:3000
+            description: Git server and CI
+            siteMonitor: http://<tailscale-ip>:3000
+        - homelab-app:
+            href: http://<tailscale-ip>:3001
+            description: Deploy pipeline test app
+            siteMonitor: http://<tailscale-ip>:3001/health
+    - Monitoring:
+        - Grafana:
+            href: http://<tailscale-ip>:3003
+            description: Metrics dashboards
+            siteMonitor: http://<tailscale-ip>:3003/api/health
+        - Uptime Kuma:
+            href: http://<tailscale-ip>:3002
+            description: Service uptime
+            siteMonitor: http://<tailscale-ip>:3002
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+        disk: /
+    - datetime:
+        text_size: xl
+        format:
+          timeStyle: short
+          hourCycle: h23
+  bookmarks.yaml: |
+    []
+  docker.yaml: |
+    {}
+  kubernetes.yaml: |
+    {}

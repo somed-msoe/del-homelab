@@ -1,6 +1,15 @@
 - name: Baseline homelab config
   hosts: homelab
   become: true
+  vars:
+    # name = folder under /home/delsoro, src = folder under docker-compose/
+    compose_stacks:
+      - { name: gitea, src: gitea }
+      - { name: gitea-runner, src: gitea/gitea-runner }
+      - { name: jellyfin, src: jellyfin }
+      - { name: komga, src: komga }
+      - { name: navidrome, src: navidrome }
+      - { name: uptime-kuma, src: uptime-kuma }
   tasks:
     - name: Install base packages
       ansible.builtin.apt:
@@ -39,3 +48,69 @@
         hour: "3"
         job: "/home/delsoro/homelab-infra/scripts/backup.sh >> /home/delsoro/backup.log 2>&1"
         disabled: true
+
+    - name: Stack directories exist
+      ansible.builtin.file:
+        path: "/home/delsoro/{{ item.name }}"
+        state: directory
+        owner: delsoro
+        group: delsoro
+        mode: "0755"
+      loop: "{{ compose_stacks }}"
+      tags: compose
+
+    - name: Compose files match the repo
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../docker-compose/{{ item.src }}/docker-compose.yml"
+        dest: "/home/delsoro/{{ item.name }}/docker-compose.yml"
+        owner: delsoro
+        group: delsoro
+        mode: "0644"
+      loop: "{{ compose_stacks }}"
+      register: compose_files
+      tags: compose
+
+    # up -d is a no-op when nothing differs, so this only recreates what changed
+    - name: Apply changed stacks
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: "/home/delsoro/{{ item.item.name }}"
+      become_user: delsoro
+      loop: "{{ compose_files.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.changed
+      changed_when: true
+      tags: compose
+
+    - name: Monitoring .env exists (holds the Grafana password, not in git)
+      ansible.builtin.stat:
+        path: /home/delsoro/monitoring/.env
+      register: monitoring_env
+      tags: compose
+
+    - name: Fail if monitoring .env is missing
+      ansible.builtin.fail:
+        msg: "Create /home/delsoro/monitoring/.env from docker-compose/monitoring/.env.example first"
+      when: not monitoring_env.stat.exists
+      tags: compose
+
+    - name: Monitoring files match the repo
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../docker-compose/monitoring/"
+        dest: /home/delsoro/monitoring/
+        owner: delsoro
+        group: delsoro
+        directory_mode: "0755"
+        mode: "0644"
+      register: monitoring_files
+      tags: compose
+
+    - name: Apply monitoring stack
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: /home/delsoro/monitoring
+      become_user: delsoro
+      when: monitoring_files.changed
+      changed_when: true
+      tags: compose

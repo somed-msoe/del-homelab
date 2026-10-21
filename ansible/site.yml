@@ -55,7 +55,7 @@
         state: directory
         owner: delsoro
         group: delsoro
-        mode: "0755"
+        mode: "0775"
       loop: "{{ compose_stacks }}"
       tags: compose
 

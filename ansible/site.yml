@@ -40,14 +40,14 @@
         - manga
         - music
 
-    - name: Nightly backup cron (enable once /mnt/backup is mounted)
-      ansible.builtin.cron:
-        name: homelab nightly backup
-        user: delsoro
-        minute: "0"
-        hour: "3"
-        job: "/home/delsoro/homelab-infra/scripts/backup.sh >> /home/delsoro/backup.log 2>&1"
-        disabled: true
+    # The 03:00 UTC cron entry lives in root's crontab and is not managed here.
+    - name: Nightly restic backup script
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/homelab-backup.sh"
+        dest: /usr/local/bin/homelab-backup.sh
+        owner: root
+        group: root
+        mode: "0755"
 
     - name: Stack directories exist
       ansible.builtin.file:

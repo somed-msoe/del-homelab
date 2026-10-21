@@ -62,6 +62,7 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 | homelab-app   | 3001  | My Node.js dashboard             |
 | Uptime Kuma   | 3002  | Service monitoring               |
 | Grafana       | 3003  | Metrics dashboards               |
+| Homepage      | 80    | Landing page (runs on k3s)       |
 | Navidrome     | 4533  | Music (planned, not installed)   |
 | Jellyfin      | 8096  | Media server                     |
 | Komga         | 25600 | Comics/manga server              |
@@ -116,8 +117,13 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Data**: `~/uptime-kuma/data` (SQLite)
 - **Compose file**: `docker-compose/uptime-kuma/docker-compose.yml` in
   `homelab-infra`
-- **Monitors**: Gitea, homelab-app (/health), Jellyfin, Komga, all via
-  `host.docker.internal` (the compose file maps it with `extra_hosts`)
+- **Monitors**: Gitea, homelab-app (/health), Jellyfin, Komga, Navidrome,
+  Grafana, all via `host.docker.internal` (the compose file maps it with
+  `extra_hosts`)
+- **Nightly blip**: Komga shows down for ~1 min around 22:00 local
+  (03:00 UTC). That is the backup stopping the containers, not a fault.
+  Set Retries to 2-3 or add a daily maintenance window before enabling
+  alerts, or it will notify every night
 - **Limit**: runs on the same machine, so it can't alert when the whole
   box goes down. The dead-man's switch below covers that.
 
@@ -153,13 +159,64 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
   not covered by `backup.sh`. Metrics are rebuildable
 - **Limit**: same as Kuma, runs on the box it watches
 
-## 7. Motivation
+## 7. Backups
+
+### Nightly restic backup
+- **What it does**: 03:00 UTC, root's cron runs
+  `/usr/local/bin/homelab-backup.sh`. It stops gitea, komga, navidrome,
+  uptime-kuma and jellyfin (so SQLite files are consistent), runs
+  `restic backup` on their folders, restarts them, then prunes
+  (7 daily, 4 weekly, 6 monthly)
+- **Script**: `scripts/homelab-backup.sh` in `homelab-infra`; Ansible
+  installs it. The cron entry itself is in root's crontab, not managed
+  by Ansible
+- **Repository**: `/srv/restic-local` (`RESTIC_REPOSITORY` overrides it),
+  password file `/root/restic/pass`
+- **Covers**: gitea, gitea-runner, komga, navidrome, uptime-kuma,
+  jellyfin config (not its cache). Log: `/var/log/homelab-backup.log`
+- **Doesn't cover**: Prometheus/Grafana volumes (metrics are rebuildable),
+  the media library itself
+- **Weak spots**: the repo is on the same disk as the data, so a disk
+  failure loses both. The restic password only exists on that disk
+- **Check**: `sudo restic -r /srv/restic-local --password-file
+  /root/restic/pass snapshots` showed one snapshot per night
+- TODO: add the USB drive as a second repository (the drive arrived,
+  not yet plugged in)
+- TODO: copy the restic password somewhere off the server
+- TODO: do a restore test (`restic restore latest --target /tmp/x`) and
+  record the date
+
+## 8. Kubernetes (k3s)
+
+- **What**: k3s v1.36.5+k3s1 (pinned) running next to Docker. Docker
+  services are untouched; this is for learning
+- **Install**: `ansible/k3s.yml` (run with `-K`). The kubeconfig is
+  world-readable (`/etc/rancher/k3s/k3s.yaml`) and `.bashrc` exports
+  `KUBECONFIG`, so `kubectl` works without sudo
+- **Ingress**: built-in Traefik on host ports 80/443
+- **Manifests**: `k8s/<app>/` in `homelab-infra`, applied with
+  `kubectl apply -k`. The server's checkout is the source:
+  `cd ~/homelab-infra && git pull && kubectl apply -k k8s/homepage`
+- **Footprint**: about 600-800 MB RAM on top of Docker
+
+### Homepage
+- **What it does**: one page linking to every service with live up/down
+  status and host CPU/RAM/disk. Open `http://del-homelab`
+- **Config**: ConfigMap in `k8s/homepage/configmap.yaml`. Config is read
+  at pod start, so after changing it: `kubectl apply -k k8s/homepage &&
+  kubectl -n homepage rollout restart deploy/homepage`
+- **Allowed hosts**: `HOMEPAGE_ALLOWED_HOSTS` lists the pod IP (needed for
+  probes), the Tailscale IP, `del-homelab` and the LAN IP. Any other
+  address gets a 400
+- **Links**: use the Tailscale IP, which pods and my PC can both reach
+
+## 9. Motivation
 
 To understand how the infrastructure actually works, not because
 self-hosting is more practical. I want hands-on experience with real
 sysadmin/DevOps work for my own growth.
 
-## 8. Problems hit & fixes (running log)
+## 10. Problems hit & fixes (running log)
 - **Jellyfin crash-looping on first start** — container showed `Restarting (139)`
   and logs said `Access to the path '/config/log' is denied`. Cause: the
   `config`/`cache` bind-mount folders didn't exist yet, so Docker created
@@ -223,7 +280,29 @@ sysadmin/DevOps work for my own growth.
   exists inside containers (via `extra_hosts`). From my PC use the
   Tailscale IP; use `host.docker.internal` only in Kuma monitors.
 
-## 9. Roadmap
+- **Ansible `become` timing out on Ubuntu 26.04** — `Timed out waiting
+  for become success or become password prompt`, even with `-K`. Cause:
+  this Ubuntu ships `sudo-rs` as `sudo`, which doesn't print the prompt
+  Ansible waits for. The classic sudo is still installed as `sudo.ws`.
+  Fix: `ansible_become_exe=/usr/bin/sudo.ws` in the inventory. Lesson:
+  `sudo --version` is worth checking when automation can't get root.
+
+- **Homepage crash-looping on k3s** — pod restarted, tiles showed ERROR
+  and `API Error`. Previous logs (`kubectl logs --previous`) said
+  `EROFS: read-only file system, copyfile ... custom.css`. Cause:
+  Homepage v2 writes default files into its config dir and a ConfigMap
+  mount is read-only. Fix: init container copies the ConfigMap into an
+  `emptyDir` mounted at `/app/config`. Lesson: when a pod restarts, read
+  the *previous* container's logs, the current ones are just the restart.
+
+- **Komga down every night at 22:00** — Kuma showed a 1-minute outage
+  daily. Cause: the 03:00 UTC restic backup stops the containers. I had
+  assumed no nightly backup existed because my user's crontab was empty;
+  it lives in root's crontab. Lesson: check root's crontab and
+  `journalctl` around the time before guessing, and check what already
+  exists before building a duplicate.
+
+## 11. Roadmap
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
 - [x] Phase 2: Gitea
@@ -233,7 +312,10 @@ sysadmin/DevOps work for my own growth.
 - [x] Phase 5b: Navidrome (music server)
 - [x] Phase 6a: Monitoring (Uptime Kuma + healthchecks.io)
 - [x] Phase 6b: Grafana + Prometheus
-- [ ] Phase 7: Ansible (Infrastructure as Code)
-- [ ] Phase 8: k3s (lightweight Kubernetes)
+- [ ] Phase 7: Ansible (Infrastructure as Code) — base config, compose
+      stacks and backup script done; sudo tasks not yet run end to end
+- [ ] Phase 8: k3s (lightweight Kubernetes) — installed, Homepage runs
+      on it; next: move something real, learn kubectl
 - [ ] Side quest: manual WireGuard setup
-- [ ] Backups: Gitea data and Komga config, plus a tested restore
+- [ ] Backups: nightly restic works; still need an off-disk copy (USB)
+      and a tested restore

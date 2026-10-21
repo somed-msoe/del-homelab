@@ -30,3 +30,12 @@
         - media/shows
         - manga
         - music
+
+    - name: Nightly backup cron (enable once /mnt/backup is mounted)
+      ansible.builtin.cron:
+        name: homelab nightly backup
+        user: delsoro
+        minute: "0"
+        hour: "3"
+        job: "/home/delsoro/homelab-infra/scripts/backup.sh >> /home/delsoro/backup.log 2>&1"
+        disabled: true

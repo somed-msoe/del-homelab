@@ -61,6 +61,7 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 | Gitea         | 3000  | Git server (SSH on 222)          |
 | homelab-app   | 3001  | My Node.js dashboard             |
 | Uptime Kuma   | 3002  | Service monitoring               |
+| Grafana       | 3003  | Metrics dashboards               |
 | Navidrome     | 4533  | Music (planned, not installed)   |
 | Jellyfin      | 8096  | Media server                     |
 | Komga         | 25600 | Comics/manga server              |
@@ -135,6 +136,23 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Alert test**: TODO: record the date, how long the email took, and
   that the recovery email arrived
 
+### Prometheus + Grafana (metrics)
+- **What it does**: Prometheus scrapes numbers every 30s and keeps 30
+  days of history; Grafana draws them. Kuma answers "is it up?",
+  this answers "why, and what's the trend?"
+- **Stack** (`docker-compose/monitoring/`, runs from `~/monitoring`):
+  Prometheus, node-exporter (host CPU/RAM/disk/network), cAdvisor
+  (per-container CPU/RAM), Grafana
+- **Port**: Grafana on 3003. Prometheus is not published (9090 is
+  taken by another service); Grafana reaches it over the Docker network
+- **Login**: user `admin`, password in `~/monitoring/.env` (chmod 600,
+  not in git; `.env.example` shows the format)
+- **Dashboards**: imported from grafana.com, 1860 (Node Exporter Full)
+  and 14282 (cAdvisor). Not in git yet; export to JSON if I customize
+- **Data**: Docker named volumes (`prometheus-data`, `grafana-data`),
+  not covered by `backup.sh`. Metrics are rebuildable
+- **Limit**: same as Kuma, runs on the box it watches
+
 ## 7. Motivation
 
 To understand how the infrastructure actually works, not because
@@ -192,6 +210,19 @@ sysadmin/DevOps work for my own growth.
   mangled. Fix: `echo "set enable-bracketed-paste off" >> ~/.inputrc`,
   then open a new SSH session.
 
+- **cAdvisor dashboard empty, no container names** — Prometheus had
+  cgroup data but no `name` label, so the dashboard had nothing to show.
+  cAdvisor logs said `failed to identify the read-write layer ID`.
+  Cause: Docker uses the containerd image store
+  (`docker info` shows `io.containerd.snapshotter.v1`), which cAdvisor
+  v0.52.1 can't map to containers. Fix: upgrade cAdvisor to v0.55.1.
+  Lesson: when a dashboard is blank, query Prometheus directly to see
+  which labels actually exist before blaming the dashboard.
+
+- **`host.docker.internal` timed out in my browser** — that name only
+  exists inside containers (via `extra_hosts`). From my PC use the
+  Tailscale IP; use `host.docker.internal` only in Kuma monitors.
+
 ## 9. Roadmap
 
 - [x] Phase 1: Core infra (Ubuntu, Docker, SSH, Tailscale)
@@ -201,7 +232,7 @@ sysadmin/DevOps work for my own growth.
 - [x] Phase 5a: Jellyfin (media server)
 - [x] Phase 5b: Navidrome (music server)
 - [x] Phase 6a: Monitoring (Uptime Kuma + healthchecks.io)
-- [ ] Phase 6b: Grafana + Prometheus
+- [x] Phase 6b: Grafana + Prometheus
 - [ ] Phase 7: Ansible (Infrastructure as Code)
 - [ ] Phase 8: k3s (lightweight Kubernetes)
 - [ ] Side quest: manual WireGuard setup

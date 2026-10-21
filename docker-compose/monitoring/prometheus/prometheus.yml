@@ -10,6 +10,9 @@ scrape_configs:
   - job_name: node
     static_configs:
       - targets: ["host.docker.internal:9100"]
+    relabel_configs:
+      - target_label: instance
+        replacement: del-homelab
 
   - job_name: cadvisor
     static_configs:

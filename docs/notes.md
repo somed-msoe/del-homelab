@@ -66,6 +66,7 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 | Navidrome     | 4533  | Music (planned, not installed)   |
 | Jellyfin      | 8096  | Media server                     |
 | Komga         | 25600 | Comics/manga server              |
+| Minecraft     | 25565 | Modded game server (Fabric)      |
 
 ### Gitea (self-hosted Git server)
 - **What it does**: private GitHub — hosts my own repos
@@ -106,6 +107,23 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Clients**: KMReader (works), Tachiyomi Komga extension (needs the
   account email as the username)
 - **Data location**: TODO: add the config and library paths
+
+### Minecraft (private multiplayer server)
+- **What it does**: modded server for a private group, reached over
+  Tailscale at `<tailscale-ip>:25565`
+- **Image**: `itzg/minecraft-server`; compose file is
+  `docker-compose/minecraft/docker-compose.yml`, runs from `~/minecraft`
+- **Mods**: `TYPE` defaults to Fabric. Drop jars in `~/minecraft/data/mods`
+  or list Modrinth slugs in `MC_MODRINTH_PROJECTS`. Change loader/version/RAM
+  via `~/minecraft/.env` (`MC_TYPE`, `MC_VERSION`, `MC_MEMORY`), then
+  `docker compose up -d`. Clients need the same loader and mods
+- **Players**: allowlist enforced. `docker exec minecraft rcon-cli whitelist add <name>`,
+  `op <name>`, `whitelist list`
+- **Backups**: included in the nightly restic run without stopping the
+  server (`save-off`, `save-all flush`, backup, `save-on`). Logs excluded
+- **Monitoring**: Kuma TCP monitor on `host.docker.internal:25565`;
+  the container also has a `mc-health` healthcheck
+- **Access**: only over Tailscale, no router port forward
 
 ## 6. Monitoring
 
@@ -173,7 +191,7 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Repository**: `/srv/restic-local` (`RESTIC_REPOSITORY` overrides it),
   password file `/root/restic/pass`
 - **Covers**: gitea, gitea-runner, komga, navidrome, uptime-kuma,
-  jellyfin config (not its cache). Log: `/var/log/homelab-backup.log`
+  jellyfin config (not its cache), minecraft world and mods. Log: `/var/log/homelab-backup.log`
 - **Doesn't cover**: Prometheus/Grafana volumes (metrics are rebuildable),
   the media library itself
 - **Weak spots**: the repo is on the same disk as the data, so a disk

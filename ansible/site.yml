@@ -8,6 +8,7 @@
       - { name: gitea-runner, src: gitea/gitea-runner }
       - { name: jellyfin, src: jellyfin }
       - { name: komga, src: komga }
+      - { name: minecraft, src: minecraft }
       - { name: navidrome, src: navidrome }
       - { name: uptime-kuma, src: uptime-kuma }
   tasks:

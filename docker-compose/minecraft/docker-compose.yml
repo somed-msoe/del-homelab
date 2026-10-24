@@ -1,0 +1,34 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft
+    restart: unless-stopped
+    ports:
+      - "25565:25565"
+    environment:
+      # By setting EULA=TRUE you accept https://aka.ms/MinecraftEULA
+      EULA: "TRUE"
+      # Override any of these in ~/minecraft/.env (not in git), then `docker compose up -d`.
+      # TYPE: FABRIC / FORGE / NEOFORGE for mods, PAPER for plugins, VANILLA for neither
+      TYPE: "${MC_TYPE:-FABRIC}"
+      VERSION: "${MC_VERSION:-LATEST}"
+      MEMORY: "${MC_MEMORY:-3G}"
+      # Mods: drop jars into ./data/mods, or list Modrinth slugs here (comma separated)
+      MODRINTH_PROJECTS: "${MC_MODRINTH_PROJECTS:-}"
+      # Player management: only allowlisted players can join
+      ENABLE_WHITELIST: "TRUE"
+      ENFORCE_WHITELIST: "TRUE"
+      WHITELIST: "${MC_WHITELIST:-}"
+      OPS: "${MC_OPS:-}"
+      MOTD: "del-homelab"
+      TZ: "America/Chicago"
+    volumes:
+      - ./data:/data
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "mc-health"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 3m

@@ -58,6 +58,23 @@
         group: root
         mode: "0755"
 
+    # Ubuntu's stock login messages (help links, sysinfo, ads, update counts).
+    # Package upgrades can restore the exec bit; re-run the playbook if they return.
+    - name: Find stock login message scripts
+      ansible.builtin.find:
+        paths: /etc/update-motd.d
+        file_type: any
+        excludes: ["00-header", "01-delsoro-banner"]
+      register: stock_motd
+
+    - name: Disable stock login message scripts
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: "0644"
+      loop: "{{ stock_motd.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
     - name: Stack directories exist
       ansible.builtin.file:
         path: "/home/delsoro/{{ item.name }}"

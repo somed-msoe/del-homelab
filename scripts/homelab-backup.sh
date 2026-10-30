@@ -37,4 +37,18 @@ restic backup \
   --exclude node_modules \
   --tag homelab
 
+# bring services back before the slower prune and USB copy
+cleanup
+trap - EXIT
+
 restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+
+# off-disk copy; skipped if the USB drive isn't mounted
+USB_REPO=/mnt/usb-backup/restic
+if mountpoint -q /mnt/usb-backup; then
+  restic -r "$USB_REPO" copy \
+    --from-repo "$RESTIC_REPOSITORY" --from-password-file "$RESTIC_PASSWORD_FILE"
+  restic -r "$USB_REPO" forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+else
+  echo "WARNING: /mnt/usb-backup not mounted, skipped USB copy" >&2
+fi

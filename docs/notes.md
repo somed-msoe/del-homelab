@@ -198,8 +198,14 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
   failure loses both. The restic password only exists on that disk
 - **Check**: `sudo restic -r /srv/restic-local --password-file
   /root/restic/pass snapshots` showed one snapshot per night
-- TODO: add the USB drive as a second repository (the drive arrived,
-  not yet plugged in)
+- **USB copy**: after the local backup, the script runs `restic copy`
+  into `/mnt/usb-backup/restic` (8GB ext4 drive, label `homelab-bak`,
+  fstab `nofail`, same password file) and prunes it with the same
+  retention. Skipped with a warning if the drive isn't mounted. Repo was
+  46M when set up
+- **Deploying**: Ansible copies the script to `/usr/local/bin`; the
+  server's `~/homelab-infra` checkout must be pulled first or it
+  installs the old version
 - TODO: copy the restic password somewhere off the server
 - TODO: do a restore test (`restic restore latest --target /tmp/x`) and
   record the date

@@ -172,7 +172,13 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Login**: user `admin`, password in `~/monitoring/.env` (chmod 600,
   not in git; `.env.example` shows the format)
 - **Dashboards**: imported from grafana.com, 1860 (Node Exporter Full)
-  and 14282 (cAdvisor). Not in git yet; export to JSON if I customize
+  and 14282 (cAdvisor). Now provisioned from
+  `docker-compose/monitoring/grafana/dashboards/*.json` (read-only in the
+  UI, loaded at Grafana start). The Prometheus datasource uid is pinned in
+  its provisioning file because the cAdvisor JSON refers to it directly.
+  To change a dashboard: edit in the UI, export via the API (`GET
+  /api/dashboards/uid/<uid>`, keep `.dashboard`, set `id` to null),
+  overwrite the JSON, commit, run the playbook, `docker restart grafana`
 - **Data**: Docker named volumes (`prometheus-data`, `grafana-data`),
   not covered by `backup.sh`. Metrics are rebuildable
 - **Limit**: same as Kuma, runs on the box it watches

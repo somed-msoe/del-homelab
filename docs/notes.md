@@ -357,6 +357,12 @@ sysadmin/DevOps work for my own growth.
       message
 - [ ] Phase 8: k3s (lightweight Kubernetes) — installed, Homepage runs
       on it; next: move something real, learn kubectl
+- [ ] Phase 9: MCP server (`c:\dev\homelab-mcp`, separate repo) — lets an
+      AI client check container status, logs, disk, Jellyfin and
+      Minecraft. Phase 1 scaffold done (ping, server_info, tests pass);
+      next: Docker read-only tools, then a gated `restart_container`
+      with an allowlist and audit log. Plan and threat model are in that
+      repo's README
 - [ ] Side quest: manual WireGuard setup
-- [ ] Backups: nightly restic + USB copy work and restore is tested
-      (2026-10-30); still need the restic password stored off the server
+- [x] Backups: nightly restic + USB copy work, restore tested
+      (2026-10-30), restic password saved off the server

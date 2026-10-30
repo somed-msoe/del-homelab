@@ -50,6 +50,14 @@
         group: root
         mode: "0755"
 
+    - name: Login banner
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/motd/01-delsoro-banner"
+        dest: /etc/update-motd.d/01-delsoro-banner
+        owner: root
+        group: root
+        mode: "0755"
+
     - name: Stack directories exist
       ansible.builtin.file:
         path: "/home/delsoro/{{ item.name }}"

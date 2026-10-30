@@ -157,8 +157,13 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
 - **Covers**: laptop off, asleep, crashed, network lost, cron stopped
 - **Doesn't cover**: which of those it was (check Tailscale last-seen)
   or whether services work (Uptime Kuma does that)
-- **Alert test**: TODO: record the date, how long the email took, and
-  that the recovery email arrived
+- **Alert test**: 2026-10-30, sent `/fail` by hand at 08:23:47 UTC. The
+  "DOWN" email arrived about 10 seconds later. The next cron ping marked
+  it up at 08:25:02 UTC (downtime 1m15s) and the "UP" email arrived.
+  Email delivery and recovery work. Not yet tested: stopping the cron job
+  and waiting out the grace period (5 min period + 10 min grace)
+- **Check name**: emails show it as "My First Check" (the default),
+  not `del-homelab`; rename it in the dashboard if more checks get added
 
 ### Prometheus + Grafana (metrics)
 - **What it does**: Prometheus scrapes numbers every 30s and keeps 30

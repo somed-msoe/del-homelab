@@ -207,8 +207,9 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
   server's `~/homelab-infra` checkout must be pulled first or it
   installs the old version
 - TODO: copy the restic password somewhere off the server
-- TODO: do a restore test (`restic restore latest --target /tmp/x`) and
-  record the date
+- **Restore test**: 2026-10-30, `restic restore latest --target /tmp/x`
+  from the USB repo restored all 1202 files/dirs (162 MiB, incl.
+  minecraft). Run it as root; a plain `ls` on the target is denied
 
 ## 8. Kubernetes (k3s)
 
@@ -341,5 +342,5 @@ sysadmin/DevOps work for my own growth.
 - [ ] Phase 8: k3s (lightweight Kubernetes) — installed, Homepage runs
       on it; next: move something real, learn kubectl
 - [ ] Side quest: manual WireGuard setup
-- [ ] Backups: nightly restic works; still need an off-disk copy (USB)
-      and a tested restore
+- [ ] Backups: nightly restic + USB copy work and restore is tested
+      (2026-10-30); still need the restic password stored off the server

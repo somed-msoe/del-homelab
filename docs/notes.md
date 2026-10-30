@@ -337,8 +337,13 @@ sysadmin/DevOps work for my own growth.
 - [x] Phase 5b: Navidrome (music server)
 - [x] Phase 6a: Monitoring (Uptime Kuma + healthchecks.io)
 - [x] Phase 6b: Grafana + Prometheus
-- [ ] Phase 7: Ansible (Infrastructure as Code) — base config, compose
-      stacks and backup script done; sudo tasks not yet run end to end
+- [x] Phase 7: Ansible (Infrastructure as Code) — `site.yml` and
+      `k3s.yml` run end to end on the server (2026-10-30); second run
+      of `site.yml` gave `changed=0`. Run from `~/homelab-infra/ansible`
+      after `git pull`: `ansible-playbook -i inventory.ini site.yml -K`
+      (add `--check --diff` for a dry run). A mistyped `BECOME` password
+      shows as "Duplicate become password prompt", not a wrong-password
+      message
 - [ ] Phase 8: k3s (lightweight Kubernetes) — installed, Homepage runs
       on it; next: move something real, learn kubectl
 - [ ] Side quest: manual WireGuard setup

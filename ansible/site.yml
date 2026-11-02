@@ -14,7 +14,7 @@
   tasks:
     - name: Install base packages
       ansible.builtin.apt:
-        name: [curl, git, restic]
+        name: [curl, git, restic, python3.14-venv]
         state: present
         update_cache: true
 
@@ -140,3 +140,74 @@
       when: monitoring_files.changed
       changed_when: true
       tags: compose
+
+    # homelab-mcp is not a service: Claude Desktop launches it over SSH (stdio).
+    # Docs in docs/notes.md. The Jellyfin key is added by hand, never via git.
+    - name: homelab-mcp checkout from Gitea
+      ansible.builtin.git:
+        repo: "gitea:delsoro/homelab-mcp.git"
+        dest: /home/delsoro/homelab-mcp
+        version: main
+        accept_newhostkey: true
+      become_user: delsoro
+      register: mcp_repo
+      tags: mcp
+
+    - name: homelab-mcp venv exists
+      ansible.builtin.command:
+        cmd: python3 -m venv .venv
+        chdir: /home/delsoro/homelab-mcp
+        creates: /home/delsoro/homelab-mcp/.venv/bin/python
+      become_user: delsoro
+      register: mcp_venv
+      tags: mcp
+
+    - name: Install homelab-mcp into the venv
+      ansible.builtin.command:
+        cmd: .venv/bin/pip install -e .
+        chdir: /home/delsoro/homelab-mcp
+      become_user: delsoro
+      when: mcp_repo.changed or mcp_venv.changed
+      changed_when: true
+      tags: mcp
+
+    - name: homelab-mcp config and audit directories
+      ansible.builtin.file:
+        path: "/home/delsoro/{{ item }}"
+        state: directory
+        owner: delsoro
+        group: delsoro
+        mode: "0700"
+      loop:
+        - .config/homelab-mcp
+        - .homelab-mcp
+      tags: mcp
+
+    # force: false creates an empty placeholder once and never overwrites the real file
+    - name: homelab-mcp env file exists (holds JELLYFIN_API_KEY, not in git)
+      ansible.builtin.copy:
+        content: ""
+        dest: /home/delsoro/.config/homelab-mcp/env
+        owner: delsoro
+        group: delsoro
+        mode: "0600"
+        force: false
+      tags: mcp
+
+    - name: Check the Jellyfin key is set (value is never printed)
+      ansible.builtin.command:
+        cmd: grep -q '^JELLYFIN_API_KEY=.' /home/delsoro/.config/homelab-mcp/env
+      become_user: delsoro
+      register: mcp_key
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      tags: mcp
+
+    - name: Warn if the Jellyfin key is missing
+      ansible.builtin.debug:
+        msg: >-
+          JELLYFIN_API_KEY is empty. Fill it in on the server with:
+          read -rs k && printf 'JELLYFIN_API_KEY=%s\n' "$k" > ~/.config/homelab-mcp/env
+      when: mcp_key.rc != 0
+      tags: mcp

@@ -49,5 +49,6 @@ copy are replaced with placeholders such as `<tailscale-ip>`.
 
 ## Related
 
-`homelab-mcp`, a separate Python MCP server that lets AI clients inspect the
-homelab. This repo deploys it; its source lives in its own repo.
+[del-homelab-mcp](https://github.com/somed-msoe/del-homelab-mcp), a separate
+Python MCP server that lets AI clients inspect the homelab. This repo deploys
+it; its source lives in its own repo.

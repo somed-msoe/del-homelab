@@ -188,6 +188,33 @@ Quick reference (host ports, reachable at `http://<tailscale-ip>:<port>`):
   not covered by `backup.sh`. Metrics are rebuildable
 - **Limit**: same as Kuma, runs on the box it watches
 
+### homelab-mcp (MCP server for AI clients)
+- **What it is**: a Python MCP server (`mcp` SDK 2.x + `docker` SDK) that
+  gives AI clients status tools. Source is the separate repo
+  `gitea:delsoro/homelab-mcp.git` (branch main). It is not a service: no
+  container, no listener. The client launches it over SSH (stdio).
+- **Tools**: ping, server_info, container_status, tail_logs, disk_usage,
+  jellyfin_library_stats, minecraft_status (all read-only) and
+  `restart_container`
+- **Restart allowlist**: jellyfin, komga, navidrome, uptime-kuma
+  (override with `HOMELAB_MCP_RESTART_ALLOWLIST`). Two steps: the first
+  call returns a single-use token valid 60 s, the second call with the
+  token restarts
+- **Launch command** (what the client runs):
+  `ssh delsoro "set -a; . ~/.config/homelab-mcp/env; set +a; exec ~/homelab-mcp/.venv/bin/python -m homelab_mcp.server"`
+- **Client side**: a Claude Desktop MCP server entry on my PC. Not
+  managed from this repo
+- **Deployed by Ansible** (`site.yml`, tag `mcp`): `python3.14-venv`,
+  clone to `~/homelab-mcp`, venv + `pip install -e .`, config dir
+  (700). `git pull` happens on each run
+- **Secret**: `~/.config/homelab-mcp/env` (file 600, dir 700) holds
+  `JELLYFIN_API_KEY`. Ansible only creates an empty file; fill it by hand:
+  `read -rs k && printf 'JELLYFIN_API_KEY=%s\n' "$k" > ~/.config/homelab-mcp/env`.
+  Optional: `JELLYFIN_URL` (default http://localhost:8096),
+  `MINECRAFT_HOST` / `MINECRAFT_PORT`
+- **Audit log**: `~/.homelab-mcp/audit.log` (dir 700, file 600), JSON
+  lines, created by the server
+
 ## 7. Backups
 
 ### Nightly restic backup
@@ -337,6 +364,9 @@ sysadmin/DevOps work for my own growth.
   it lives in root's crontab. Lesson: check root's crontab and
   `journalctl` around the time before guessing, and check what already
   exists before building a duplicate.
+- **`python3 -m venv` fails for homelab-mcp on Ubuntu 26.04** — Python
+  3.14 ships without `ensurepip`; the apt package `python3.14-venv` is
+  needed first. Ansible installs it with the other base packages.
 
 ## 11. Roadmap
 
@@ -351,18 +381,17 @@ sysadmin/DevOps work for my own growth.
 - [x] Phase 7: Ansible (Infrastructure as Code) — `site.yml` and
       `k3s.yml` run end to end on the server (2026-10-30); second run
       of `site.yml` gave `changed=0`. Run from `~/homelab-infra/ansible`
-      after `git pull`: `ansible-playbook -i inventory.ini site.yml -K`
+      after `git pull`: `ansible-playbook -i inventory.ini site.yml`
       (add `--check --diff` for a dry run). A mistyped `BECOME` password
       shows as "Duplicate become password prompt", not a wrong-password
       message
 - [ ] Phase 8: k3s (lightweight Kubernetes) — installed, Homepage runs
       on it; next: move something real, learn kubectl
-- [ ] Phase 9: MCP server (`c:\dev\homelab-mcp`, separate repo) — lets an
+- [x] Phase 9: MCP server (`c:\dev\homelab-mcp`, separate repo) — lets an
       AI client check container status, logs, disk, Jellyfin and
-      Minecraft. Phase 1 scaffold done (ping, server_info, tests pass);
-      next: Docker read-only tools, then a gated `restart_container`
-      with an allowlist and audit log. Plan and threat model are in that
-      repo's README
+      Minecraft. All phases done and tested end to end through Claude
+      Desktop (2026-11-02); deployed by Ansible, see the homelab-mcp
+      section. Plan and threat model are in that repo's README
 - [ ] Side quest: manual WireGuard setup
 - [x] Backups: nightly restic + USB copy work, restore tested
       (2026-10-30), restic password saved off the server
